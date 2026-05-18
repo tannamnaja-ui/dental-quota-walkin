@@ -7,7 +7,8 @@ node_modules/
 
 # Build output
 dist/
-build/
+build/install_files/
+build/dentalquotaWalkin.exe
 
 # Logs
 *.log

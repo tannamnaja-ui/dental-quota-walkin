@@ -5,7 +5,16 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "pkg": "pkg . --target node18-win-x64 --output ../build/install_files/dental-quota-walkin.exe"
+  },
+  "pkg": {
+    "targets": [
+      "node18-win-x64"
+    ],
+    "scripts": [
+      "src/**/*.js"
+    ]
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -15,6 +24,7 @@
     "pg": "^8.12.0"
   },
   "devDependencies": {
+    "@yao-pkg/pkg": "^6.19.0",
     "nodemon": "^3.1.4"
   }
 }

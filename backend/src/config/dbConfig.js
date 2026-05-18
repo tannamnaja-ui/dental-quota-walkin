@@ -1,7 +1,11 @@
 const fs   = require('fs');
 const path = require('path');
 
-const CONFIG_PATH = path.join(__dirname, '../../db_config.json');
+// When packaged with pkg, write config to ProgramData (writable by all users).
+// In dev mode, keep it next to backend root.
+const CONFIG_PATH = process.pkg
+  ? path.join(process.env.ProgramData || 'C:\\ProgramData', 'DentalQuotaWalkin', 'db_config.json')
+  : path.join(__dirname, '../../db_config.json');
 
 function readConfig() {
   if (!fs.existsSync(CONFIG_PATH)) return null;
@@ -13,6 +17,8 @@ function readConfig() {
 }
 
 function writeConfig(config) {
+  const dir = path.dirname(CONFIG_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
 }
 
