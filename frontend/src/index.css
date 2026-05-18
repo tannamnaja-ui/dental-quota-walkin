@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ขยายทุก rem-based size ขึ้น 50% — ครอบคลุมตัวอักษร, padding, margin, ขนาดกล่อง */
+html {
+  font-size: 150%;
+}
