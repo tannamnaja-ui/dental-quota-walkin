@@ -8,7 +8,6 @@ DefaultDirName={autopf}\DentalQuotaWalkin
 DefaultGroupName=Dental Quota Walk-in
 OutputDir=.
 OutputBaseFilename=dentalquotaWalkin
-SetupIconFile=
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

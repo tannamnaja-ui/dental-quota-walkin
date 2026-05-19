@@ -1,0 +1,133 @@
+name: Build & Release Installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js 18 ────────────────────────────────────────────────
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # ── 3. Build Frontend ────────────────────────────────────────────
+      - name: Install & build frontend
+        shell: powershell
+        run: |
+          Set-Location frontend
+          npm install
+          npm run build
+          Write-Host "Frontend build complete" -ForegroundColor Green
+
+      # ── 4. Backend deps + pkg ────────────────────────────────────────
+      - name: Install backend dependencies
+        shell: powershell
+        run: |
+          Set-Location backend
+          npm install
+          Write-Host "Backend dependencies installed" -ForegroundColor Green
+
+      # ── 5. Prepare install_files directory ───────────────────────────
+      - name: Prepare install_files
+        shell: powershell
+        run: |
+          $root         = $env:GITHUB_WORKSPACE
+          $installFiles = "$root\build\install_files"
+          $publicDir    = "$installFiles\public"
+
+          if (Test-Path $installFiles) { Remove-Item $installFiles -Recurse -Force }
+          New-Item -ItemType Directory -Path $publicDir -Force | Out-Null
+
+          # Frontend dist → public/
+          Copy-Item "$root\frontend\dist\*" $publicDir -Recurse -Force
+
+          # VBS launcher scripts
+          Copy-Item "$root\build\launch.vbs" $installFiles -Force
+          Copy-Item "$root\build\stop.vbs"   $installFiles -Force
+
+          Write-Host "install_files ready" -ForegroundColor Green
+
+      # ── 6. Package backend with pkg (bundles Node.js runtime) ────────
+      - name: Package backend exe (pkg)
+        shell: powershell
+        run: |
+          $root   = $env:GITHUB_WORKSPACE
+          $outExe = "$root\build\install_files\dental-quota-walkin.exe"
+          Set-Location "$root\backend"
+          npx pkg src/app.js --target node18-win-x64 --output $outExe
+          if ($LASTEXITCODE -ne 0) { throw "pkg failed" }
+          $mb = [math]::Round((Get-Item $outExe).Length / 1MB, 1)
+          Write-Host "Backend exe: $mb MB" -ForegroundColor Green
+
+      # ── 7. Install Inno Setup 6 ──────────────────────────────────────
+      - name: Install Inno Setup 6
+        shell: powershell
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (Test-Path $iscc) {
+            Write-Host "Inno Setup already installed" -ForegroundColor Yellow
+          } else {
+            $tmp = "$env:TEMP\innosetup.exe"
+            Invoke-WebRequest "https://files.jrsoftware.org/is/6/innosetup-6.3.3.exe" `
+              -OutFile $tmp -UseBasicParsing
+            Start-Process $tmp -ArgumentList "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES" -Wait
+            Remove-Item $tmp -Force
+            Write-Host "Inno Setup installed" -ForegroundColor Green
+          }
+
+      # ── 8. Compile Inno Setup installer ──────────────────────────────
+      - name: Compile installer
+        shell: powershell
+        run: |
+          $iscc    = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $issFile = "$env:GITHUB_WORKSPACE\build\installer.iss"
+          & $iscc $issFile
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+          $out = "$env:GITHUB_WORKSPACE\build\dentalquotaWalkin.exe"
+          $mb  = [math]::Round((Get-Item $out).Length / 1MB, 1)
+          Write-Host "Installer: dentalquotaWalkin.exe ($mb MB)" -ForegroundColor Green
+
+      # ── 9. Create / update GitHub Release ────────────────────────────
+      - name: Get build date
+        id: date
+        shell: powershell
+        run: |
+          $d = Get-Date -Format "yyyy-MM-dd HH:mm UTC"
+          "BUILD_DATE=$d" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: "Dental Quota Walk-in — ล่าสุด"
+          body: |
+            ## 🦷 Dental Quota Walk-in System
+
+            | รายละเอียด | ค่า |
+            |---|---|
+            | สร้างเมื่อ | ${{ steps.date.outputs.BUILD_DATE }} |
+            | Commit | `${{ github.sha }}` |
+            | Node.js | รวมอยู่ใน exe แล้ว (ไม่ต้องติดตั้งเพิ่ม) |
+
+            ### วิธีติดตั้ง
+            1. ดาวน์โหลด **`dentalquotaWalkin.exe`** ด้านล่าง
+            2. ดับเบิ้ลคลิก → Next → Finish
+            3. ระบบเปิดเบราว์เซอร์อัตโนมัติ ไม่ต้องเปิด command prompt
+
+            > **ติดตั้งได้เลย — ไม่ต้องใช้ internet ระหว่างติดตั้ง**
+          files: build/dentalquotaWalkin.exe
+          make_latest: true
+          prerelease: false
