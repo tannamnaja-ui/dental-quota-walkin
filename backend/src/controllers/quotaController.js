@@ -186,22 +186,36 @@ const deleteQuota = async (req, res, next) => {
   }
 };
 
-// PUT /api/quota/:id — แก้ไข max_walkin_quota ของ record นั้น
+// PUT /api/quota/:id — แก้ไข max_walkin_quota และ/หรือ current_walkin_count
 const updateQuota = async (req, res, next) => {
   const { id } = req.params;
-  const { max_walkin_quota } = req.body;
+  const { max_walkin_quota, current_walkin_count } = req.body;
+
   const maxVal = parseInt(max_walkin_quota);
   if (isNaN(maxVal) || maxVal < 0) {
     return res.status(400).json({ success: false, message: 'max_walkin_quota ต้องเป็นตัวเลข ≥ 0' });
   }
+
+  let usedVal = null;
+  if (current_walkin_count !== undefined && current_walkin_count !== null && current_walkin_count !== '') {
+    usedVal = parseInt(current_walkin_count);
+    if (isNaN(usedVal) || usedVal < 0) {
+      return res.status(400).json({ success: false, message: 'โควตาที่ใช้ไปต้องเป็นตัวเลข ≥ 0' });
+    }
+  }
+
   try {
-    const result = await pool.query(
-      `UPDATE dent_daily_quota
-       SET max_walkin_quota = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE quota_id = $2
-       RETURNING *`,
-      [maxVal, id]
-    );
+    const sql = usedVal !== null
+      ? `UPDATE dent_daily_quota
+         SET max_walkin_quota = $1, current_walkin_count = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE quota_id = $3 RETURNING *`
+      : `UPDATE dent_daily_quota
+         SET max_walkin_quota = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE quota_id = $2 RETURNING *`;
+
+    const params = usedVal !== null ? [maxVal, usedVal, id] : [maxVal, id];
+    const result = await pool.query(sql, params);
+
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'ไม่พบรายการโควตานี้' });
     }

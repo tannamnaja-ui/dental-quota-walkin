@@ -32,7 +32,11 @@ export const quotaAPI = {
   setup:     (data) => apiClient.post('/quota/setup', data),
   setupBulk: (data) => apiClient.post('/quota/setup-bulk', data),
   use:       (id)   => apiClient.post(`/quota/${id}/use`),
-  update:    (id, max_walkin_quota) => apiClient.put(`/quota/${id}`, { max_walkin_quota }),
+  update:    (id, max_walkin_quota, current_walkin_count) =>
+    apiClient.put(`/quota/${id}`, {
+      max_walkin_quota,
+      ...(current_walkin_count !== undefined ? { current_walkin_count } : {}),
+    }),
   delete:    (id)   => apiClient.delete(`/quota/${id}`),
 };
 

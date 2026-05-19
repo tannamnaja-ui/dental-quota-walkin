@@ -252,16 +252,12 @@ export default function QuotaManagement() {
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6d28d9' }}>แพทย์</label>
                 {doctors.length > 0 ? (
-                  <select
-                    value={editDoctorCode} onChange={e => setEditDoctorCode(e.target.value)}
-                    className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                    style={{ borderColor: '#ddd6fe', background: '#faf5ff', color: '#3b0764' }}
-                  >
-                    <option value="">— เลือกแพทย์ —</option>
-                    {doctors.map(d => (
-                      <option key={d.doctor_code} value={d.doctor_code}>{d.doctor_name}</option>
-                    ))}
-                  </select>
+                  <DoctorCombobox
+                    doctors={doctors}
+                    value={editDoctorCode}
+                    onChange={setEditDoctorCode}
+                    placeholder="ค้นหาแพทย์..."
+                  />
                 ) : (
                   <div className="border rounded-xl px-3 py-2.5 text-sm"
                        style={{ borderColor: '#ddd6fe', background: '#f9fafb', color: '#6b7280' }}>
@@ -494,20 +490,13 @@ export default function QuotaManagement() {
               เลือกแพทย์
               {loadingDoc && <span className="ml-1 text-xs animate-pulse" style={{ color: '#a78bfa' }}>กำลังโหลด...</span>}
             </label>
-            <select
+            <DoctorCombobox
+              doctors={doctors}
               value={formDoctorCode}
-              onChange={e => setFormDoctorCode(e.target.value)}
+              onChange={setFormDoctorCode}
               disabled={selPosIds.length === 0 || loadingDoc}
-              className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ borderColor: '#ddd6fe', background: '#faf5ff', color: '#3b0764' }}
-            >
-              <option value="">
-                {selPosIds.length === 0 ? '— เลือกตำแหน่งก่อน —' : `— เลือกแพทย์ (${doctors.length} คน) —`}
-              </option>
-              {doctors.map(d => (
-                <option key={d.doctor_code} value={d.doctor_code}>{d.doctor_name}</option>
-              ))}
-            </select>
+              placeholder={selPosIds.length === 0 ? '— เลือกตำแหน่งก่อน —' : `ค้นหาแพทย์ (${doctors.length} คน)`}
+            />
           </div>
 
           {/* ความชำนาญ */}
@@ -675,6 +664,145 @@ export default function QuotaManagement() {
       )}
 
       <div ref={listEndRef} />
+    </div>
+  );
+}
+
+function DoctorCombobox({ doctors, value, onChange, disabled, placeholder }) {
+  const [search,  setSearch]  = useState('');
+  const [open,    setOpen]    = useState(false);
+  const [focused, setFocused] = useState(false);
+  const wrapRef = useRef(null);
+
+  const selectedDoc = doctors.find(d => d.doctor_code === value);
+
+  const filtered = search.trim()
+    ? doctors.filter(d => d.doctor_name.toLowerCase().includes(search.toLowerCase()))
+    : doctors;
+
+  // ปิด dropdown เมื่อคลิกนอก
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+        setFocused(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleFocus = () => {
+    if (disabled) return;
+    setFocused(true);
+    setSearch('');
+    setOpen(true);
+  };
+
+  const handleChange = (e) => {
+    setSearch(e.target.value);
+    setOpen(true);
+    if (!e.target.value) onChange('');
+  };
+
+  const handleSelect = (doc) => {
+    onChange(doc.doctor_code);
+    setSearch('');
+    setOpen(false);
+    setFocused(false);
+  };
+
+  const displayValue = focused ? search : (selectedDoc?.doctor_name || '');
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={displayValue}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          disabled={disabled}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="w-full border rounded-xl px-3 py-2.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ borderColor: open ? '#a78bfa' : '#ddd6fe', background: '#faf5ff', color: '#3b0764' }}
+        />
+        {/* arrow icon */}
+        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-xs"
+              style={{ color: '#a78bfa' }}>
+          {open ? '▲' : '▼'}
+        </span>
+      </div>
+
+      {open && !disabled && (
+        <div className="absolute z-50 w-full mt-1 rounded-xl shadow-xl overflow-hidden"
+             style={{ border: '1.5px solid #ddd6fe', background: 'white', maxHeight: '14rem' }}>
+
+          {/* จำนวนผลลัพธ์ */}
+          {search.trim() && (
+            <div className="px-3 py-1.5 text-xs border-b"
+                 style={{ color: '#a78bfa', borderColor: '#ede9fe', background: '#faf5ff' }}>
+              พบ {filtered.length} รายการ
+            </div>
+          )}
+
+          <div className="overflow-y-auto" style={{ maxHeight: '12rem' }}>
+            {filtered.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-center" style={{ color: '#9ca3af' }}>
+                ไม่พบแพทย์ที่ค้นหา
+              </div>
+            ) : (
+              filtered.map(doc => {
+                const isSelected = doc.doctor_code === value;
+                // highlight ส่วนที่ตรงกับ search
+                const name = doc.doctor_name;
+                const idx  = search.trim()
+                  ? name.toLowerCase().indexOf(search.toLowerCase())
+                  : -1;
+
+                return (
+                  <button
+                    key={doc.doctor_code}
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); handleSelect(doc); }}
+                    className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 transition-colors"
+                    style={{
+                      background: isSelected ? '#f5f0ff' : 'white',
+                      borderBottom: '1px solid #f3e8ff',
+                      color: '#1f2937',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f5f0ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = isSelected ? '#f5f0ff' : 'white'}
+                  >
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                          style={{ background: isSelected
+                            ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)'
+                            : 'linear-gradient(135deg,#c4b5fd,#a78bfa)' }}>
+                      {name.charAt(0)}
+                    </span>
+                    <span className="flex-1 truncate">
+                      {idx >= 0 ? (
+                        <>
+                          {name.slice(0, idx)}
+                          <mark style={{ background: '#ede9fe', color: '#5b21b6', borderRadius: '2px', padding: '0 1px' }}>
+                            {name.slice(idx, idx + search.length)}
+                          </mark>
+                          {name.slice(idx + search.length)}
+                        </>
+                      ) : name}
+                    </span>
+                    {isSelected && (
+                      <span style={{ color: '#7c3aed', fontSize: '0.75rem' }}>✓</span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

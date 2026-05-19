@@ -18,6 +18,7 @@ export default function DailyQuota() {
   // inline edit
   const [editingId,  setEditingId]  = useState(null);
   const [editValue,  setEditValue]  = useState('');
+  const [editUsed,   setEditUsed]   = useState('');
 
   // confirm delete
   const [deletingId, setDeletingId] = useState(null);
@@ -46,16 +47,19 @@ export default function DailyQuota() {
   const startEdit = (q) => {
     setEditingId(q.quota_id);
     setEditValue(String(q.max_walkin_quota));
+    setEditUsed(String(q.current_walkin_count));
     setDeletingId(null);
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditValue(''); };
+  const cancelEdit = () => { setEditingId(null); setEditValue(''); setEditUsed(''); };
 
   const saveEdit = async (quotaId) => {
-    const val = parseInt(editValue);
-    if (isNaN(val) || val < 0) { showAlert('error', 'กรุณากรอกตัวเลข ≥ 0'); return; }
+    const maxVal  = parseInt(editValue);
+    const usedVal = parseInt(editUsed);
+    if (isNaN(maxVal)  || maxVal  < 0) { showAlert('error', 'โควตาสูงสุดต้องเป็นตัวเลข ≥ 0');  return; }
+    if (isNaN(usedVal) || usedVal < 0) { showAlert('error', 'โควตาที่ใช้ไปต้องเป็นตัวเลข ≥ 0'); return; }
     try {
-      await quotaAPI.update(quotaId, val);
+      await quotaAPI.update(quotaId, maxVal, usedVal);
       showAlert('success', 'อัปเดตโควตาสำเร็จ');
       setEditingId(null);
       fetchQuota();
@@ -239,19 +243,33 @@ export default function DailyQuota() {
 
                     {/* โควต้าที่ใช้ไปแล้ว + bar */}
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs whitespace-nowrap"
-                              style={{ color: isFull ? '#dc2626' : '#7c3aed' }}>
-                          {q.current_walkin_count}
-                        </span>
-                        <div className="w-16 bg-gray-100 rounded-full h-1.5 shrink-0">
-                          <div className="h-1.5 rounded-full"
-                               style={{
-                                 width: `${pct}%`,
-                                 background: isFull ? '#ef4444' : pct > 70 ? '#f59e0b' : '#8b5cf6',
-                               }} />
+                      {isEditing ? (
+                        <input
+                          type="number" min="0"
+                          value={editUsed}
+                          onChange={e => setEditUsed(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter')  saveEdit(q.quota_id);
+                            if (e.key === 'Escape') cancelEdit();
+                          }}
+                          className="w-20 border rounded-lg px-2 py-1 text-center font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          style={{ borderColor: '#fdba74', background: '#fff7ed', color: '#9a3412' }}
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs whitespace-nowrap"
+                                style={{ color: isFull ? '#dc2626' : '#7c3aed' }}>
+                            {q.current_walkin_count}
+                          </span>
+                          <div className="w-16 bg-gray-100 rounded-full h-1.5 shrink-0">
+                            <div className="h-1.5 rounded-full"
+                                 style={{
+                                   width: `${pct}%`,
+                                   background: isFull ? '#ef4444' : pct > 70 ? '#f59e0b' : '#8b5cf6',
+                                 }} />
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </td>
 
                     {/* โควตาสูงสุด (editable) */}
